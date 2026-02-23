@@ -71,9 +71,10 @@ class BookingController extends Controller
     {
         if ($request->ajax()) {
             try {
-                // 1. Validasi Input
+                // 1. Validasi Input (+ Tambahan no_hp)
                 $request->validate([
                     'nama_peminjam' => 'required|string|max:255',
+                    'no_hp'         => 'required|numeric', // <-- Baru
                     'ruangan_id'    => 'required',
                     'waktu_mulai'   => 'required|date',
                     'waktu_selesai' => 'required|date|after:waktu_mulai',
@@ -83,7 +84,7 @@ class BookingController extends Controller
                 $start = \Carbon\Carbon::parse($request->waktu_mulai);
                 $end = \Carbon\Carbon::parse($request->waktu_selesai);
 
-                // 2. Cek Bentrok Jadwal
+                // 2. Cek Bentrok Jadwal (Sama persis dengan kode Anda)
                 $bentrok = Booking::where('ruangan_id', $request->ruangan_id)
                     ->whereIn('status_booking', ['Pending', 'Dikonfirmasi', 'Digunakan'])
                     ->where(function ($query) use ($start, $end) {
@@ -98,7 +99,7 @@ class BookingController extends Controller
                     ], 422);
                 }
 
-                // 3. Buat User / Peminjam Otomatis
+                // 3. Buat User / Peminjam Otomatis (Sama persis dengan kode Anda)
                 $user = \App\Models\User::firstOrCreate(
                     ['name' => $request->nama_peminjam],
                     [
@@ -109,9 +110,13 @@ class BookingController extends Controller
 
                 $total = $request->total_bayar ?? 0;
 
-                // 4. Simpan ke Database
+                // 4. Buat Kode Booking Dulu (Diubah sedikit agar kodenya bisa dipanggil ke WA)
+                $kode_booking_baru = 'BKG-' . strtoupper(\Illuminate\Support\Str::random(6));
+
+                // 5. Simpan ke Database (+ Tambahan no_hp)
                 Booking::create([
-                    'kode_booking'   => 'BKG-' . strtoupper(\Illuminate\Support\Str::random(6)),
+                    'kode_booking'   => $kode_booking_baru, // <-- Pakai variabel yang dibuat di atas
+                    'no_hp'          => $request->no_hp,    // <-- Baru
                     'user_id'        => $user->id,
                     'ruangan_id'     => $request->ruangan_id,
                     'waktu_mulai'    => $start->format('Y-m-d H:i:s'),
@@ -121,7 +126,22 @@ class BookingController extends Controller
                     'status_booking' => 'Pending',
                 ]);
 
-                return response()->json(['status' => 'success', 'message' => 'Booking berhasil diajukan!']);
+                // 6. SIAPKAN LOGIKA WHATSAPP (Baru)
+                $pesan = "Halo *{$request->nama_peminjam}*,\n\n";
+                $pesan .= "Selamat! Pengajuan booking ruangan Anda telah kami terima.\n";
+                $pesan .= "Mohon simpan kode di bawah ini untuk ditunjukkan ke petugas saat check-in:\n\n";
+                $pesan .= "🎫 *KODE BOOKING: {$kode_booking_baru}*\n\n";
+                $pesan .= "Terima kasih.";
+
+                // Buat link wa.me
+                $link_wa = "https://wa.me/" . $request->no_hp . "?text=" . urlencode($pesan);
+
+                // 7. Kembalikan Response (+ Selipkan link_wa agar ditangkap Javascript)
+                return response()->json([
+                    'status'  => 'success',
+                    'message' => 'Booking berhasil diajukan!',
+                    'link_wa' => $link_wa // <-- Baru
+                ]);
             } catch (\Exception $e) {
                 return response()->json(['errors' => ['sistem' => [$e->getMessage()]]], 422);
             }

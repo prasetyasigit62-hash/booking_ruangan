@@ -512,6 +512,12 @@
                                 <input type="text" name="nama_peminjam" class="form-control" required
                                     placeholder="Masukkan nama Anda">
                             </div>
+                            <div class="form-group mb-3">
+                                <label>Nomor WhatsApp Pelanggan</label>
+                                <input type="text" name="no_hp" class="form-control"
+                                    placeholder="Contoh: 628123456789 (Wajib pakai 62)" required>
+                                <small class="text-muted text-danger">*Gunakan awalan 62, tanpa spasi atau tanda +</small>
+                            </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-bold text-secondary">Pilih Ruangan</label>
                                 <select class="form-select border-primary cursor-pointer" name="ruangan_id"
@@ -821,12 +827,22 @@
                     success: function(response) {
                         $('#modalBooking').modal('hide');
 
+                        // Modifikasi SweetAlert untuk menampilkan Tombol Lanjut WA
                         Swal.fire({
                             icon: 'success',
                             title: 'Berhasil!',
                             text: response.message,
-                            showConfirmButton: false,
-                            timer: 2000
+                            showConfirmButton: true,
+                            confirmButtonText: '<i class="fab fa-whatsapp"></i> Kirim Pesan WA',
+                            confirmButtonColor: '#25D366', // Warna Hijau Khas WhatsApp
+                            showCancelButton: true,
+                            cancelButtonText: 'Tutup',
+                        }).then((result) => {
+                            // Sihir WA bekerja di sini:
+                            // Jika user mengklik tombol "Kirim Pesan WA", tab baru akan terbuka
+                            if (result.isConfirmed && response.link_wa) {
+                                window.open(response.link_wa, '_blank');
+                            }
                         });
 
                         calendar.refetchEvents();
