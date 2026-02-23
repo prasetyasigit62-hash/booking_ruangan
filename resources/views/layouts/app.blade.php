@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ $title ?? 'Booking Ruangan' }}</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+
+    <style>
+        /* Styling Navbar Modern */
+        .navbar-custom {
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+            /* Bayangan sangat lembut */
+            padding: 12px 0;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            color: #333 !important;
+            font-size: 1.4rem;
+            letter-spacing: 0.5px;
+        }
+
+        .logo-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+        }
+
+        .nav-item .nav-link {
+            font-weight: 500;
+            color: #666;
+            padding: 10px 18px !important;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            /* Membuat efek hover sangat smooth */
+        }
+
+        /* Efek Hover untuk Menu Biasa */
+        .nav-item .nav-link:hover,
+        .nav-item .nav-link.active {
+            color: #0d6efd;
+            background-color: rgba(13, 110, 253, 0.08);
+        }
+
+        /* Efek Spesial untuk Tombol Dashboard */
+        .btn-dashboard {
+            background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+            box-shadow: 0 4px 10px rgba(13, 110, 253, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .btn-dashboard:hover {
+            color: #ffffff !important;
+            transform: translateY(-3px);
+            /* Tombol sedikit melayang saat disentuh */
+            box-shadow: 0 6px 15px rgba(13, 110, 253, 0.4);
+        }
+
+        .hover-translate-y {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .hover-translate-y:hover {
+            transform: translateY(-3px);
+        }
+
+        .hover-primary:hover {
+            color: #0d6efd !important;
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+
+        .transition-all {
+            transition: all 0.3s ease;
+        }
+
+        /* ========================================== */
+        /* STYLE UNTUK MENU NAVBAR YANG SEDANG AKTIF  */
+        /* ========================================== */
+        .nav-item .nav-link.active {
+            /* Warna Gradasi Biru ke Cyan Identik Monitoring */
+            background: linear-gradient(135deg, #007bff, #00d2ff) !important;
+            color: #ffffff !important;
+            border: none !important;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3) !important;
+            font-weight: 700 !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+            border-radius: 50rem !important;
+            transform: translateY(0);
+        }
+
+        /* ========================================== */
+        /* ANIMASI MELAYANG SAAT DISENTUH (HOVER)     */
+        /* ========================================== */
+        .nav-link {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+        }
+
+        /* Saat menu yang tidak aktif disentuh */
+        .nav-link:not(.active):hover {
+            transform: translateY(-4px) !important;
+            background-color: #f8f9fa !important;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08) !important;
+            color: #0d6efd !important;
+        }
+
+        /* Saat menu yang aktif (Biru) disentuh */
+        .nav-link.active:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 6px 15px rgba(13, 110, 253, 0.5) !important;
+        }
+    </style>
+    @stack('styles')
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-custom sticky-top">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+                <div
+                    class="logo-icon bg-primary text-white rounded p-2 d-flex justify-content-center align-items-center">
+                    <i class="fas fa-building"></i>
+                </div>
+                SmartBooking
+            </a>
+
+            <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 gap-2 align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link fw-bold px-3 py-2 rounded-pill transition-all {{ request()->routeIs('booking.index') ? 'active bg-primary text-white shadow-sm' : 'text-secondary hover-primary' }}"
+                            href="{{ route('booking.index') }}">
+                            <i class="fas fa-calendar-alt me-1"></i> Kalender Ruangan
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('ruangan.index') ? 'active fw-bold text-primary' : '' }}"
+                            href="{{ route('ruangan.index') }}">
+                            <i class="fas fa-door-open me-1"></i> Data Ruangan
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link fw-bold px-3 py-2 rounded-pill transition-all {{ request()->routeIs('booking.monitoring') ? 'active bg-primary text-white shadow-sm' : 'text-secondary hover-primary' }}"
+                            href="{{ route('booking.monitoring') }}">
+                            <i class="fas fa-desktop me-1"></i> Monitoring Real-Time
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link fw-bold px-3 py-2 rounded-pill transition-all {{ request()->routeIs('booking.checkin') ? 'active bg-primary text-white shadow-sm' : 'text-secondary hover-primary' }}"
+                            href="{{ route('booking.checkin') }}">
+                            <i class="fas fa-qrcode me-1"></i> Check-In Ruangan
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fw-bold px-3 py-2 rounded-pill transition-all {{ request()->is('dashboard*') ? 'active bg-primary text-white shadow-sm' : 'text-secondary hover-primary' }}"
+                            href="{{ url('/dashboard') }}">
+                            <i class="fas fa-chart-pie me-1"></i> Dashboard Admin
+                        </a>
+                    </li>
+
+                    <li class="nav-item border-start ms-2 ps-2"> <a class="nav-link text-danger fw-medium"
+                            href="#"
+                            onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                            <i class="fas fa-sign-out-alt me-1"></i> Logout
+                        </a>
+
+                        <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                            @csrf
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        @yield('content')
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+    @stack('scripts')
+</body>
+
+</html>
