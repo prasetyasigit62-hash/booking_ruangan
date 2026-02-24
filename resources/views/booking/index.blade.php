@@ -468,6 +468,42 @@
             transform: none !important;
             box-shadow: none !important;
         }
+
+        /* Efek Berkedip Halus */
+        .blink-alert {
+            animation: blinker 1.5s cubic-bezier(.5, 0, 1, 1) infinite alternate;
+            background-color: #fff8e1;
+            border: 1px solid #ffe082;
+        }
+
+        @keyframes blinker {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0.6;
+            }
+        }
+
+        /* Efek Berdenyut pada Badge */
+        .animate-pulse {
+            animation: pulse-sm 2s infinite;
+        }
+
+        @keyframes pulse-sm {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
     </style>
 
     <div class="row">
@@ -505,24 +541,31 @@
                 </div>
                 <form id="formBooking">
                     <div class="modal-body p-4">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
+
+                        <div class="row mb-2">
+                            <div class="col-md-6 mb-2 mb-md-0">
                                 <label class="form-label fw-bold">Nama Lengkap Anda <span
                                         class="text-danger">*</span></label>
                                 <input type="text" name="nama_peminjam" class="form-control" required
                                     placeholder="Masukkan nama Anda">
                             </div>
-                            <div class="form-group mb-3">
-                                <label>Nomor WhatsApp Pelanggan</label>
-                                <input type="text" name="no_hp" class="form-control"
-                                    placeholder="Contoh: 628123456789 (Wajib pakai 62)" required>
-                                <small class="text-muted text-danger">*Gunakan awalan 62, tanpa spasi atau tanda +</small>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Nomor WhatsApp Pelanggan <span
+                                        class="text-danger">*</span></label>
+                                <input type="text" name="no_hp" class="form-control" placeholder="Contoh: 628123456789"
+                                    required>
+                                <small class="text-muted text-danger" style="font-size: 0.75rem;">*Gunakan awalan 62, tanpa
+                                    spasi atau +</small>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold text-secondary">Pilih Ruangan</label>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label class="form-label fw-bold text-secondary">Pilih Ruangan <span
+                                        class="text-danger">*</span></label>
                                 <select class="form-select border-primary cursor-pointer" name="ruangan_id"
                                     id="pilih_ruangan" required>
-                                    <option value="">-- Silakan Pilih --</option>
+                                    <option value="">-- Silakan Pilih Ruangan --</option>
                                     @foreach ($ruangans as $r)
                                         <option value="{{ $r->id }}" data-h5="{{ $r->harga_5_jam ?? 0 }}"
                                             data-h1d="{{ $r->harga_1_hari ?? 0 }}" data-h3d="{{ $r->harga_3_hari ?? 0 }}"
@@ -534,7 +577,7 @@
                             </div>
                         </div>
 
-                        <div class="row bg-light pt-3 pb-1 mb-3 rounded border">
+                        <div class="row bg-light pt-3 pb-1 mb-3 rounded border mx-0">
                             <div class="col-md-4 mb-3">
                                 <label class="form-label fw-bold text-secondary small">Waktu Mulai</label>
                                 <input type="text" class="form-control jam-premium bg-white border-primary"
@@ -597,10 +640,12 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold text-secondary">Keperluan/Kegiatan</label>
-                            <textarea class="form-control" name="keperluan" rows="3" placeholder="Contoh: Rapat Presentasi Proyek X"
-                                required></textarea>
+                            <label class="form-label fw-bold text-secondary">Keperluan / Kegiatan <span
+                                    class="text-danger">*</span></label>
+                            <textarea class="form-control border-primary" name="keperluan" rows="3"
+                                placeholder="Contoh: Rapat Presentasi Proyek X" required style="resize: none;"></textarea>
                         </div>
+
                     </div>
                     <div class="modal-footer bg-light" style="border-radius: 0 0 15px 15px;">
                         <button type="button" class="btn btn-secondary rounded-pill px-4"

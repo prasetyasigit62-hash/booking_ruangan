@@ -54,4 +54,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/ruangan/{id}', [App\Http\Controllers\RuanganController::class, 'destroy'])->name('ruangan.destroy');
 
     Route::get('/get-harga-ruangan/{id}', [App\Http\Controllers\RuanganController::class, 'getHarga']);
+
+    // Route untuk tombol kirim reminder manual
+    Route::post('/admin/booking/send-reminder-manual', [BookingController::class, 'sendReminderManual'])->name('admin.booking.reminder');
+
+    Route::get('/booking/remind/{id}', [App\Http\Controllers\BookingController::class, 'remindSingle'])->name('admin.booking.remind.single');
 });

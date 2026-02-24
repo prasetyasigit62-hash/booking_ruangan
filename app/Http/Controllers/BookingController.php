@@ -13,14 +13,82 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\KonfirmasiBookingMail;
 use App\Exports\BookingExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Artisan;
 
 class BookingController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Ambil daftar ruangan yang statusnya Tersedia untuk form dropdown
+        // 1. Logika Server-Side AJAX DataTables
+        if ($request->ajax()) {
+            // Ambil data booking dengan relasi user dan ruangan
+            $data = Booking::with(['user', 'ruangan'])->select('bookings.*');
+
+            return DataTables::of($data)
+                ->addIndexColumn()
+
+                // MANIPULASI KOLOM TANGGAL (Untuk Efek Berkedip H-2)
+                ->editColumn('waktu_mulai', function ($row) {
+                    $hariIni = Carbon::now()->startOfDay();
+                    $tanggalAcara = Carbon::parse($row->waktu_mulai)->startOfDay();
+                    $selisihHari = $hariIni->diffInDays($tanggalAcara, false);
+
+                    $tanggalFormat = Carbon::parse($row->waktu_mulai)->format('d M Y');
+                    $waktuFormat = Carbon::parse($row->waktu_mulai)->format('H:i');
+
+                    // Cek jika acara H-2, H-1, atau Hari H (dan status aktif)
+                    $isMendekati = ($selisihHari >= 0 && $selisihHari <= 2) && in_array($row->status_booking, ['Pending', 'Dikonfirmasi']);
+
+                    if ($isMendekati) {
+                        $labelPeringatan = $selisihHari == 0 ? 'HARI INI' : 'H-' . $selisihHari;
+                        $warnaBadge = $selisihHari == 0 ? 'bg-danger' : 'bg-warning text-dark';
+
+                        return '
+                            <div class="p-2 rounded blink-alert text-center">
+                                <span class="small fw-bold text-uppercase">' . $tanggalFormat . '</span><br>
+                                <span class="badge ' . $warnaBadge . ' shadow-sm animate-pulse mt-1">
+                                    <i class="fas fa-clock me-1"></i> ' . $labelPeringatan . ' (' . $waktuFormat . ')
+                                </span>
+                            </div>';
+                    }
+
+                    return '<div class="text-center">' . $tanggalFormat . '<br><small class="text-muted">' . $waktuFormat . ' WIB</small></div>';
+                })
+
+                // MANIPULASI KOLOM AKSI (Tambahkan Tombol Remind WA)
+                ->addColumn('action', function ($row) {
+                    // Tombol standar (Anda bisa sesuaikan ID dan Class-nya)
+                    $btn = '<div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-primary btn-detail" data-id="' . $row->id . '"><i class="fas fa-eye"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline-info btn-edit" data-id="' . $row->id . '"><i class="fas fa-edit"></i></button>';
+
+                    // Logika Tambah Tombol WhatsApp jika H-2
+                    $hariIni = Carbon::now()->startOfDay();
+                    $tanggalAcara = Carbon::parse($row->waktu_mulai)->startOfDay();
+                    $selisihHari = $hariIni->diffInDays($tanggalAcara, false);
+
+                    if (($selisihHari >= 0 && $selisihHari <= 2) && in_array($row->status_booking, ['Pending', 'Dikonfirmasi'])) {
+                        $urlReminder = route('admin.booking.remind.single', $row->id);
+                        $btn .= '<a href="' . $urlReminder . '" target="_blank" class="btn btn-sm btn-success" title="Kirim WA Pengingat">
+                                    <i class="fab fa-whatsapp"></i> Remind
+                                 </a>';
+                    }
+
+                    $btn .= '</div>';
+                    return $btn;
+                })
+
+                ->rawColumns(['waktu_mulai', 'action']) // Penting agar HTML dirender browser
+                ->make(true);
+        }
+
+        // 2. Logika Normal (Bukan AJAX) - Memuat Halaman Pertama Kali
         $ruangans = Ruangan::where('status', 'Tersedia')->get();
-        return view('booking.index', ['title' => 'Sistem Booking Ruangan', 'ruangans' => $ruangans]);
+
+        return view('booking.index', [
+            'title'    => 'Sistem Booking Ruangan',
+            'ruangans' => $ruangans
+        ]);
     }
 
     // API Server-Side untuk menarik data ke FullCalendar
@@ -126,15 +194,27 @@ class BookingController extends Controller
                     'status_booking' => 'Pending',
                 ]);
 
-                // 6. SIAPKAN LOGIKA WHATSAPP (Baru)
-                $pesan = "Halo *{$request->nama_peminjam}*,\n\n";
-                $pesan .= "Selamat! Pengajuan booking ruangan Anda telah kami terima.\n";
-                $pesan .= "Mohon simpan kode di bawah ini untuk ditunjukkan ke petugas saat check-in:\n\n";
-                $pesan .= "🎫 *KODE BOOKING: {$kode_booking_baru}*\n\n";
-                $pesan .= "Terima kasih.";
+                // 6. SIAPKAN LOGIKA WHATSAPP (Format Baru & Lebih Profesional)
+
+                // Ambil data nama ruangan (opsional, untuk memperjelas pesan WA)
+                $ruangan = \App\Models\Ruangan::find($request->ruangan_id);
+                $namaRuangan = $ruangan ? $ruangan->nama_ruangan : 'Ruangan ' . $request->ruangan_id;
+
+                $pesan = "Halo *{$request->nama_peminjam}*! ✨\n\n";
+                $pesan .= "Yeay, *request booking* ruangan Anda telah berhasil masuk ke sistem kami! 🙌\n\n";
+                $pesan .= "Berikut adalah rangkuman jadwal Anda:\n";
+                $pesan .= "📌 *Ruangan:* {$namaRuangan}\n";
+                $pesan .= "🗓️ *Tanggal:* " . \Carbon\Carbon::parse($start)->translatedFormat('d F Y') . "\n";
+                $pesan .= "🕒 *Waktu:* " . $start->format('H:i') . " WIB - " . $end->format('H:i') . " WIB\n";
+                $pesan .= "🎯 *Keperluan:* {$request->keperluan}\n\n";
+                $pesan .= "🏷️ *KODE BOOKING ANDA: {$kode_booking_baru}*\n\n";
+                $pesan .= "*Apa langkah selanjutnya?* 🤔\n";
+                $pesan .= "Tim kami sedang memastikan ruangan tersebut *ready* dan tidak bentrok dengan jadwal lain. Mohon ditunggu ya, kami akan segera menghubungi Anda kembali untuk status persetujuannya! 🚀\n\n";
+                $pesan .= "Terima kasih,\n";
+                $pesan .= "*Tim Admin Layanan Ruangan*";
 
                 // Buat link wa.me
-                $link_wa = "https://wa.me/" . $request->no_hp . "?text=" . urlencode($pesan);
+                $link_wa = "https://api.whatsapp.com/send?phone=" . $request->no_hp . "&text=" . rawurlencode($pesan);
 
                 // 7. Kembalikan Response (+ Selipkan link_wa agar ditangkap Javascript)
                 return response()->json([
@@ -387,5 +467,43 @@ class BookingController extends Controller
         }
 
         return back();
+    }
+
+    public function sendReminderManual(Request $request)
+    {
+        try {
+            // Memanggil file Command (robot) yang sudah kita buat tadi secara manual
+            Artisan::call('booking:send-reminder');
+
+            // Mengambil pesan hasil kerja robotnya (misal: "Selesai! Telah mengirim pengingat...")
+            $hasil = Artisan::output();
+
+            return back()->with('success', 'Reminder berhasil dijalankan! Output: ' . $hasil);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal menjalankan reminder: ' . $e->getMessage());
+        }
+    }
+
+     public function remindSingle($id)
+    {
+        $booking = Booking::with('ruangan', 'user')->findOrFail($id);
+        
+        $namaPeminjam = $booking->nama_peminjam ?? ($booking->user->name ?? 'Pelanggan');
+        $namaRuangan  = $booking->ruangan->nama_ruangan ?? 'Ruangan';
+        $tanggalIndo  = Carbon::parse($booking->waktu_mulai)->translatedFormat('d F Y');
+        $jam          = Carbon::parse($booking->waktu_mulai)->format('H:i');
+
+        $pesan = "🔔 *PENGINGAT JADWAL RUANGAN* 🔔\n\n";
+        $pesan .= "Halo *{$namaPeminjam}*,\n";
+        $pesan .= "Pesan ini adalah pengingat bahwa jadwal booking Anda sudah *semakin dekat*.\n\n";
+        $pesan .= "📌 *Ruangan:* {$namaRuangan}\n";
+        $pesan .= "🗓️ *Tanggal:* {$tanggalIndo}\n";
+        $pesan .= "🕒 *Waktu:* {$jam} WIB\n";
+        $pesan .= "🏷️ *KODE:* {$booking->kode_booking}\n\n";
+        $pesan .= "Sampai jumpa di lokasi! 👋";
+
+        $url = "https://api.whatsapp.com/send?phone=" . $booking->no_hp . "&text=" . rawurlencode($pesan);
+        
+        return redirect()->away($url);
     }
 }
