@@ -95,7 +95,8 @@ class BookingController extends Controller
     public function getEvents(Request $request)
     {
         try {
-            $bookings = Booking::with('ruangan:id,nama_ruangan')
+            // 1. [REVISI] Tambahkan relasi 'user' ke dalam with() agar sistem bisa memanggil nama user
+            $bookings = Booking::with(['ruangan:id,nama_ruangan', 'user'])
                 ->whereIn('status_booking', ['Pending', 'Dikonfirmasi', 'Selesai'])
                 ->get();
 
@@ -123,7 +124,11 @@ class BookingController extends Controller
                     'textColor'     => $textColor,
                     'classNames'    => $className,
                     'extendedProps' => [
-                        'status' => $booking->status_booking
+                        'status'       => $booking->status_booking,
+                        'nama_penyewa' => $booking->user->name ?? 'Penyewa',
+                        'nohp'         => $booking->no_hp, // Wajib pakai garis bawah sesuai database
+                        'keperluan'    => $booking->keperluan,
+                        'kode_booking' => $booking->kode_booking,
                     ]
                 ];
             });
@@ -484,10 +489,10 @@ class BookingController extends Controller
         }
     }
 
-     public function remindSingle($id)
+    public function remindSingle($id)
     {
         $booking = Booking::with('ruangan', 'user')->findOrFail($id);
-        
+
         $namaPeminjam = $booking->nama_peminjam ?? ($booking->user->name ?? 'Pelanggan');
         $namaRuangan  = $booking->ruangan->nama_ruangan ?? 'Ruangan';
         $tanggalIndo  = Carbon::parse($booking->waktu_mulai)->translatedFormat('d F Y');
@@ -503,7 +508,7 @@ class BookingController extends Controller
         $pesan .= "Sampai jumpa di lokasi! 👋";
 
         $url = "https://api.whatsapp.com/send?phone=" . $booking->no_hp . "&text=" . rawurlencode($pesan);
-        
+
         return redirect()->away($url);
     }
 }

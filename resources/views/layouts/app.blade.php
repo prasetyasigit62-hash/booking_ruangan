@@ -118,6 +118,18 @@
             transform: translateY(-3px) !important;
             box-shadow: 0 6px 15px rgba(13, 110, 253, 0.5) !important;
         }
+
+        /* Efek melayang dan membesar untuk tombol */
+        .btn-hover-animasi {
+            transition: all 0.3s ease-in-out !important;
+        }
+
+        .btn-hover-animasi:hover {
+            transform: scale(1.08) translateY(-2px);
+            /* Membesar 8% dan naik sedikit */
+            box-shadow: 0 6px 15px rgba(220, 53, 69, 0.4) !important;
+            /* Bayangan merah menyala */
+        }
     </style>
     @stack('styles')
 </head>
@@ -175,15 +187,20 @@
                         </a>
                     </li>
 
-                    <li class="nav-item border-start ms-2 ps-2"> <a class="nav-link text-danger fw-medium"
-                            href="#"
-                            onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                    <li class="nav-item ms-3">
+                        <a id="btn-animasi-logout" href="#"
+                            class="btn btn-danger text-white fw-bold px-4 py-2 rounded-pill shadow-sm btn-hover-animasi">
                             <i class="fas fa-sign-out-alt me-1"></i> Logout
                         </a>
 
                         <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
                             @csrf
                         </form>
+                    </li>
+
+                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                        @csrf
+                    </form>
                     </li>
                 </ul>
             </div>
@@ -200,6 +217,51 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
     @stack('scripts')
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let btnLogout = document.getElementById('btn-animasi-logout');
+
+            // Pastikan tombol ditemukan di halaman
+            if (btnLogout) {
+                btnLogout.addEventListener('click', function(e) {
+                    e.preventDefault(); // Tahan halaman agar tidak langsung refresh
+
+                    // 1. Munculkan Animasi Pop-up Konfirmasi
+                    Swal.fire({
+                        title: 'Keluar dari Sistem?',
+                        text: 'Anda harus login kembali untuk mengakses halaman ini.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#dc3545',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: '<i class="fas fa-sign-out-alt"></i> Ya, Logout',
+                        cancelButtonText: 'Batal'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+
+                            // 2. Munculkan Animasi Loading Memutar
+                            Swal.fire({
+                                title: 'Memproses Keluar...',
+                                allowOutsideClick: false,
+                                showConfirmButton: false,
+                                didOpen: () => {
+                                    Swal.showLoading();
+                                }
+                            });
+
+                            // 3. Eksekusi form logout secara rahasia
+                            setTimeout(() => {
+                                document.getElementById('logout-form').submit();
+                            }, 500); // Beri jeda 0.5 detik agar animasinya terlihat memutar
+                        }
+                    });
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

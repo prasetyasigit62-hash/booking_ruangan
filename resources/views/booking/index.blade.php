@@ -504,6 +504,40 @@
                 transform: scale(1);
             }
         }
+
+        @keyframes blinkSuperWarning {
+            0% {
+                background-color: #dc3545 !important;
+                border-color: #a71d2a !important;
+                color: #fff !important;
+                box-shadow: 0 0 12px rgba(220, 53, 69, 0.9);
+                transform: scale(1.02);
+            }
+
+            50% {
+                background-color: #ffc107 !important;
+                border-color: #d39e00 !important;
+                color: #000 !important;
+                box-shadow: none;
+                transform: scale(1);
+            }
+
+            100% {
+                background-color: #dc3545 !important;
+                border-color: #a71d2a !important;
+                color: #fff !important;
+                box-shadow: 0 0 12px rgba(220, 53, 69, 0.9);
+                transform: scale(1.02);
+            }
+        }
+
+        .event-h-min-2 {
+            animation: blinkSuperWarning 0.8s infinite !important;
+            cursor: pointer !important;
+            font-weight: 800 !important;
+            z-index: 99 !important;
+            /* Agar tampil di atas jadwal lain */
+        }
     </style>
 
     <div class="row">
@@ -854,6 +888,98 @@
                     document.getElementById("waktu_selesai")._flatpickr.setDate(jamSelesai, true);
 
                     $('#modalBooking').modal('show');
+                },
+
+                // --- [FITUR BARU] A. Fungsi Cek H-2 dan Tambah Efek Kelap-Kelip ---
+                eventDidMount: function(info) {
+                    let eventDate = new Date(info.event.start);
+                    let today = new Date();
+
+                    // Nol-kan jam agar perhitungan hari akurat
+                    eventDate.setHours(0, 0, 0, 0);
+                    today.setHours(0, 0, 0, 0);
+
+                    // Hitung selisih hari
+                    let diffTime = eventDate.getTime() - today.getTime();
+                    let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    // Ambil status dari controller
+                    let statusBooking = info.event.extendedProps.status;
+
+                    // [REVISI]: Berkedip JIKA H-2 ***DAN*** Status BUKAN Selesai
+                    if (diffDays === 2 && statusBooking !== 'Selesai') {
+                        info.el.classList.add('event-h-min-2');
+                    }
+                },
+
+                // --- [FITUR BARU] B. Fungsi Klik Event untuk Kirim WA ---
+                eventClick: function(info) {
+                    if (info.el.classList.contains('event-h-min-2')) {
+
+                        let props = info.event.extendedProps;
+                        let namaUser = props.nama_penyewa || "Penyewa";
+                        let noHp = props.nohp || "";
+
+                        // Hapus tulisan "- Keperluan" dari title kalender untuk pesan WA
+                        let namaRuangan = info.event.title.split(' - ')[0];
+
+                        // Format Tanggal dan Jam
+                        let startDate = new Date(info.event.start);
+                        let tglSewa = startDate.toLocaleDateString('id-ID', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                        });
+                        let waktuMulai = startDate.toLocaleTimeString('id-ID', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+
+                        // JIKA DATA LAMA (Nomor HP Kosong)
+                        if (!noHp) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Data Booking Lama',
+                                text: 'Jadwal ini adalah data lama yang dibuat sebelum fitur Nomor WhatsApp aktif. Silakan hapus jadwal ini dan buat simulasi jadwal H-2 yang BARU.'
+                            });
+                            return; // Hentikan proses
+                        }
+
+                        // Format nomor HP ke standar internasional (62)
+                        if (noHp.startsWith('0')) {
+                            noHp = '62' + noHp.substring(1);
+                        }
+
+                        // FORMAT PESAN WA (Sama persis dengan format Submit Booking)
+                        let textWa = `Halo *${namaUser}*! 🔔\n\n` +
+                            `Ini adalah pengingat otomatis (Reminder H-2) dari sistem bahwa ruangan Anda akan segera digunakan.\n\n` +
+                            `Berikut adalah rangkuman jadwal Anda:\n` +
+                            `📍 *Ruangan:* ${namaRuangan}\n` +
+                            `📅 *Tanggal:* ${tglSewa}\n` +
+                            `⏰ *Waktu:* ${waktuMulai} WIB\n` +
+                            `🎯 *Keperluan:* ${props.keperluan || '-'}\n` +
+                            `🏷️ *KODE BOOKING ANDA: ${props.kode_booking || '-'}*\n\n` +
+                            `Mohon persiapkan diri Anda sesuai jadwal tersebut. Kami tunggu kedatangannya!\n\n` +
+                            `*Tim Admin Layanan Ruangan*`;
+
+                        let urlWa = `https://wa.me/${noHp}?text=${encodeURIComponent(textWa)}`;
+
+                        // Tampilkan Konfirmasi menggunakan SweetAlert
+                        Swal.fire({
+                            title: 'Kirim Reminder WA?',
+                            html: `Pesan pengingat akan dikirimkan ke <b>${namaUser}</b><br><small>(${info.event.extendedProps.nohp})</small>`,
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonColor: '#25D366',
+                            cancelButtonColor: '#6c757d',
+                            confirmButtonText: '<i class="fab fa-whatsapp"></i> Kirim Pesan WA',
+                            cancelButtonText: 'Batal'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.open(urlWa, '_blank');
+                            }
+                        });
+                    }
                 }
             });
             calendar.render();
@@ -878,13 +1004,11 @@
                             title: 'Berhasil!',
                             text: response.message,
                             showConfirmButton: true,
-                            confirmButtonText: '<i class="fab fa-whatsapp"></i> Kirim Pesan WA',
-                            confirmButtonColor: '#25D366', // Warna Hijau Khas WhatsApp
+                            confirmButtonText: '<i class="fab fa-whatsapp"></i> Kirim Bukti WA',
+                            confirmButtonColor: '#25D366',
                             showCancelButton: true,
                             cancelButtonText: 'Tutup',
                         }).then((result) => {
-                            // Sihir WA bekerja di sini:
-                            // Jika user mengklik tombol "Kirim Pesan WA", tab baru akan terbuka
                             if (result.isConfirmed && response.link_wa) {
                                 window.open(response.link_wa, '_blank');
                             }
