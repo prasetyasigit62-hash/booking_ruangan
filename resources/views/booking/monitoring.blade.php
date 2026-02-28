@@ -215,13 +215,13 @@
                     </div>
 
                     <div class="d-none d-sm-block border-start h-100 mx-1 py-3"></div>
-
                     <div class="d-flex gap-2 w-100 justify-content-center mt-2 mt-sm-0 px-2 px-sm-0">
-                        <button type="submit" name="format" value="excel"
+                        <button type="button" onclick="previewExport(event, 'excel')"
                             class="btn btn-success btn-sm rounded-pill px-4 fw-bold shadow-sm flex-fill flex-sm-grow-0 transition-all hover-translate-y menu-nav-btn">
                             <i class="fas fa-file-excel me-1"></i> Excel
                         </button>
-                        <button type="submit" name="format" value="pdf"
+
+                        <button type="button" onclick="previewExport(event, 'pdf')"
                             class="btn btn-danger btn-sm rounded-pill px-4 fw-bold shadow-sm flex-fill flex-sm-grow-0 transition-all hover-translate-y menu-nav-btn">
                             <i class="fas fa-file-pdf me-1"></i> PDF
                         </button>
@@ -420,8 +420,36 @@
 
                 $('#dtl_status').html(statusBadge);
 
-                if (data.status_booking == 'Dikonfirmasi') {
-                    $('#btnCetakNota').attr('href', '/booking/' + id + '/pdf').show();
+                if (data.status_booking == 'Dikonfirmasi' || data.status_booking == 'Selesai') {
+                    // Tampilkan preview Nota di iframe
+                    $('#btnCetakNota').show().off('click').on('click', function(e) {
+                        e.preventDefault();
+
+                        let urlPdf = '/booking/' + id + '/pdf';
+
+                        Swal.fire({
+                            title: 'Preview Nota Peminjaman',
+                            html: `
+                                <div style="width: 100%; height: 60vh; background: #f8f9fa; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">
+                                    <iframe src="${urlPdf}" width="100%" height="100%" style="border: none;"></iframe>
+                                </div>
+                            `,
+                            width: '800px', // Lebar ideal untuk ukuran nota/invoice
+                            showCancelButton: true,
+                            confirmButtonColor: '#0d6efd',
+                            cancelButtonColor: '#6c757d',
+                            confirmButtonText: '<i class="fas fa-print me-1"></i> Cetak / Unduh Nota',
+                            cancelButtonText: 'Kembali',
+                            customClass: {
+                                popup: 'rounded-4 shadow-lg border-0'
+                            }
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                // Buka di tab baru untuk langsung di-print oleh admin
+                                window.open(urlPdf, '_blank');
+                            }
+                        });
+                    });
                 } else {
                     $('#btnCetakNota').hide();
                 }
@@ -430,26 +458,141 @@
             });
         }
 
-        // Fungsi Menyetujui Booking
+        // Fungsi Menyetujui Booking + Upload Bukti Bayar
         function konfirmasiBooking(id) {
             Swal.fire({
-                title: 'Setujui Peminjaman?',
-                text: "Status akan diubah menjadi Dikonfirmasi dan tagihan dianggap lunas.",
-                icon: 'warning',
+                title: 'Upload Bukti Pembayaran',
+                text: "Silakan upload foto/screenshot bukti transfer pelanggan untuk menyetujui peminjaman ini.",
+                input: 'file',
+                inputAttributes: {
+                    'accept': 'image/*',
+                    'aria-label': 'Upload Bukti Pembayaran'
+                },
+                icon: 'info',
                 showCancelButton: true,
                 confirmButtonColor: '#198754',
                 cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Ya, Setujui!'
+                confirmButtonText: '<i class="fas fa-upload"></i> Upload & Setujui',
+                cancelButtonText: 'Batal',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'Anda wajib mengupload file bukti pembayaran!'
+                    }
+                }
             }).then((result) => {
                 if (result.isConfirmed) {
-                    $.post('/booking/' + id + '/confirm', function(response) {
-                        Swal.fire('Berhasil!', response.message, 'success');
+                    let file = result.value;
+                    let formData = new FormData();
+                    formData.append('bukti_pembayaran', file); // Masukkan file ke form
+                    formData.append('_token', $('meta[name="csrf-token"]').attr('content'));
 
-                        // Refresh otomatis DataTables tanpa reload halaman!
-                        $('#tableMonitoring').DataTable().ajax.reload();
+                    // Animasi Loading
+                    Swal.fire({
+                        title: 'Mengupload & Memproses...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    // Tembak data (termasuk file) ke Controller
+                    $.ajax({
+                        url: '/booking/' + id + '/confirm',
+                        type: 'POST',
+                        data: formData,
+                        processData: false, // Wajib false untuk upload file
+                        contentType: false, // Wajib false untuk upload file
+                        success: function(response) {
+                            $('#tableMonitoring').DataTable().ajax.reload(null, false);
+
+                            Swal.fire({
+                                title: 'Berhasil Disetujui!',
+                                text: response.message,
+                                icon: 'success',
+                                showCancelButton: true,
+                                confirmButtonColor: '#25D366',
+                                cancelButtonColor: '#6c757d',
+                                confirmButtonText: '<i class="fab fa-whatsapp"></i> Kirim Notif WA',
+                                cancelButtonText: 'Tutup'
+                            }).then((waResult) => {
+
+                                // Jika tombol WA diklik
+                                if (waResult.isConfirmed && response.link_wa) {
+                                    window.open(response.link_wa, '_blank');
+
+                                }
+                            });
+                        },
+                        error: function(xhr) {
+                            Swal.fire('Error', 'Gagal memproses data. Pastikan file berupa gambar.',
+                                'error');
+                        }
                     });
                 }
             });
+        }
+
+        // Fungsi Pop-Up Preview Dokumen Asli Laporan
+        function previewExport(event, format) {
+            event.preventDefault();
+
+            let form = event.target.closest('form');
+            let startDate = form.querySelector('input[name="start_date"]').value;
+            let endDate = form.querySelector('input[name="end_date"]').value;
+
+            if (!startDate || !endDate) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Pilih Tanggal!',
+                    text: 'Isi rentang tanggal terlebih dahulu.'
+                });
+                return;
+            }
+
+            // Buat URL untuk menarik file PDF sebagai Preview
+            // (Meskipun admin klik Excel, kita tampilkan PDF-nya dulu agar bisa dibaca di browser)
+            let previewUrl = `${form.action}?start_date=${startDate}&end_date=${endDate}&format=pdf`;
+            let downloadUrl = `${form.action}?start_date=${startDate}&end_date=${endDate}&format=${format}`;
+
+            let isExcel = format === 'excel';
+            let btnColor = isExcel ? '#198754' : '#dc3545';
+            let btnIcon = isExcel ? 'fa-file-excel' : 'fa-file-pdf';
+            let btnText = isExcel ? 'Unduh Excel' : 'Unduh PDF';
+
+            // Tampilkan Loading
+            Swal.fire({
+                title: 'Memuat Preview Laporan...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Tampilkan iframe di dalam SweetAlert setelah sedikit jeda (agar loading terasa smooth)
+            setTimeout(() => {
+                Swal.fire({
+                    title: 'Preview Laporan Peminjaman',
+                    html: `
+                        <div style="width: 100%; height: 60vh; background: #f8f9fa; border-radius: 8px; overflow: hidden; border: 1px solid #dee2e6;">
+                            <iframe src="${previewUrl}" width="100%" height="100%" style="border: none;"></iframe>
+                        </div>
+                    `,
+                    width: '80%', // Lebarkan pop-up agar dokumen terbaca jelas
+                    showCancelButton: true,
+                    confirmButtonColor: btnColor,
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: `<i class="fas ${btnIcon} me-1"></i> ${btnText}`,
+                    cancelButtonText: 'Tutup',
+                    customClass: {
+                        popup: 'rounded-4 shadow-lg border-0'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Jika di-ACC, langsung unduh filenya (Excel/PDF sesuai pilihan awal)
+                        window.location.href = downloadUrl;
+                    }
+                });
+            }, 800);
         }
     </script>
 @endpush

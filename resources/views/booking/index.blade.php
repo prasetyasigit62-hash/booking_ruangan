@@ -976,7 +976,11 @@
                             cancelButtonText: 'Batal'
                         }).then((result) => {
                             if (result.isConfirmed) {
-                                window.open(urlWa, '_blank');
+                                // AMBIL ID DARI DATA KALENDER (info.event.id)
+                                let idBooking = info.event.id;
+
+                                // BUKA TAB BARU KE ROUTE REMIND
+                                window.open('/booking/remind/' + idBooking, '_blank');
                             }
                         });
                     }

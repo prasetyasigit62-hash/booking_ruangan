@@ -100,8 +100,14 @@
             </td>
         </tr>
         <tr>
-            <th>Status Pembayaran</th>
-            <td style="color: green; font-weight: bold;">{{ strtoupper($booking->status_pembayaran) }}</td>
+            <td class="text-secondary">Status Pembayaran</td>
+            <td>
+                @if ($booking->status_booking == 'Dikonfirmasi' || $booking->status_booking == 'Selesai')
+                    <span style="color: #198754; font-weight: bold;">LUNAS</span>
+                @else
+                    <span style="color: #dc3545; font-weight: bold;">BELUM BAYAR</span>
+                @endif
+            </td>
         </tr>
         <tr>
             <th>Total Harga Sewa</th>

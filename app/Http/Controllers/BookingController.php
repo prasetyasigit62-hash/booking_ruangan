@@ -118,8 +118,8 @@ class BookingController extends Controller
                 return [
                     'id'            => $booking->id,
                     'title'         => ($booking->ruangan->nama_ruangan ?? 'Ruangan') . ' - ' . $booking->keperluan,
-                    'start'         => \Carbon\Carbon::parse($booking->waktu_mulai)->toIso8601String(),
-                    'end'           => \Carbon\Carbon::parse($booking->waktu_selesai)->toIso8601String(),
+                    'start'         => \Carbon\Carbon::parse($booking->waktu_mulai)->format('Y-m-d\TH:i:s'),
+                    'end'           => \Carbon\Carbon::parse($booking->waktu_selesai)->format('Y-m-d\TH:i:s'),
                     'color'         => $color,
                     'textColor'     => $textColor,
                     'classNames'    => $className,
@@ -310,29 +310,66 @@ class BookingController extends Controller
         }
         $booking->tanggal_cetak = \Carbon\Carbon::now()->format('d F Y, H:i');
         $pdf = Pdf::loadView('booking.nota', compact('booking'));
-        return $pdf->download('Invoice-Booking-' . $booking->kode_booking . '.pdf');
+        return $pdf->stream('Invoice-Booking-' . $booking->kode_booking . '.pdf');
     }
 
-    public function confirm($id)
+    // Fungsi Konfirmasi oleh Admin (+ Upload Bukti)
+    public function confirm(Request $request, $id)
     {
-        $booking = Booking::with('user', 'ruangan')->findOrFail($id);
-
-        $booking->update([
-            'status_booking'    => 'Dikonfirmasi',
-            'status_pembayaran' => 'Lunas'
-        ]);
-
-        // ==========================================
-        // KODE KIRIM EMAIL OTOMATIS (MODE KILAT / QUEUE)
-        // ==========================================
         try {
-            // 👇 PERBAIKAN: Mengubah 'send' menjadi 'queue' agar proses loading menjadi instan! 👇
-            Mail::to($booking->user->email)->queue(new KonfirmasiBookingMail($booking));
-        } catch (\Exception $e) {
-            return response()->json(['status' => 'warning', 'message' => 'Booking dikonfirmasi, tapi email gagal terkirim: ' . $e->getMessage()]);
-        }
+            // 1. Validasi File (wajib gambar, max 2MB)
+            $request->validate([
+                'bukti_pembayaran' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            ]);
 
-        return response()->json(['status' => 'success', 'message' => 'Booking berhasil dikonfirmasi dan Email Notifikasi dikirim di latar belakang!']);
+            $booking = Booking::with(['user', 'ruangan'])->findOrFail($id);
+
+            // 2. Proses Upload File Bukti Pembayaran
+            $pathBukti = null;
+            if ($request->hasFile('bukti_pembayaran')) {
+                $file = $request->file('bukti_pembayaran');
+                $namaFile = time() . '_bukti_' . $booking->kode_booking . '.' . $file->extension();
+
+                // Simpan ke folder public/uploads/bukti_pembayaran
+                $file->move(public_path('uploads/bukti_pembayaran'), $namaFile);
+                $pathBukti = 'uploads/bukti_pembayaran/' . $namaFile;
+            }
+
+            // 3. Ubah status jadi Dikonfirmasi dan simpan path foto
+            $booking->update([
+                'status_booking'   => 'Dikonfirmasi',
+                'bukti_pembayaran' => $pathBukti
+            ]);
+
+            // 4. Pastikan nomor HP berawalan 62
+            $noHp = $booking->no_hp;
+            if (str_starts_with($noHp, '0')) {
+                $noHp = '62' . substr($noHp, 1);
+            }
+
+            // 5. RAKIT PESAN WA BESERTA EMOJI LANGSUNG DI PHP
+            $pesan = "Halo *{$booking->user->name}*! ✨\n\n";
+            $pesan .= "Kabar gembira! Pembayaran Anda telah kami terima dan peminjaman ruangan *DISETUJUI*.\n\n";
+            $pesan .= "Berikut rincian jadwal Anda:\n";
+            $pesan .= "📌 *Ruangan:* {$booking->ruangan->nama_ruangan}\n";
+            $pesan .= "📅 *Tanggal:* " . \Carbon\Carbon::parse($booking->waktu_mulai)->translatedFormat('d F Y') . "\n";
+            $pesan .= "⏰ *Waktu:* " . \Carbon\Carbon::parse($booking->waktu_mulai)->format('H:i') . " WIB\n";
+            $pesan .= "🏷️ *KODE BOOKING ANDA: {$booking->kode_booking}*\n\n";
+            $pesan .= "Silakan datang sesuai jadwal. Kami tunggu kedatangannya!\n\n";
+            $pesan .= "*Tim Admin Layanan Ruangan*";
+
+            // 6. Langsung buatkan Link WA siap pakai
+            $link_wa = "https://api.whatsapp.com/send?phone=" . $noHp . "&text=" . rawurlencode($pesan);
+
+            // 7. Kembalikan balasan sukses + link WA ke Javascript
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking berhasil disetujui & Bukti tersimpan!',
+                'link_wa' => $link_wa
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal menyetujui: ' . $e->getMessage()], 500);
+        }
     }
 
     public function exportData(Request $request)
@@ -468,7 +505,7 @@ class BookingController extends Controller
             $pdf = PDF::loadView('booking.pdf', compact('bookings', 'start_date', 'end_date'))
                 ->setPaper('A4', 'landscape');
 
-            return $pdf->download('Laporan_Booking_Modern_' . date('Y-m-d_His') . '.pdf');
+            return $pdf->stream('Laporan_Booking_Modern_' . date('Y-m-d_His') . '.pdf');
         }
 
         return back();
@@ -491,23 +528,26 @@ class BookingController extends Controller
 
     public function remindSingle($id)
     {
-        $booking = Booking::with('ruangan', 'user')->findOrFail($id);
+        $booking = Booking::with(['ruangan', 'user'])->findOrFail($id);
 
-        $namaPeminjam = $booking->nama_peminjam ?? ($booking->user->name ?? 'Pelanggan');
-        $namaRuangan  = $booking->ruangan->nama_ruangan ?? 'Ruangan';
-        $tanggalIndo  = Carbon::parse($booking->waktu_mulai)->translatedFormat('d F Y');
-        $jam          = Carbon::parse($booking->waktu_mulai)->format('H:i');
+        // 1. Pastikan nomor HP diawali 62 (Seragamkan dengan fitur ACC)
+        $noHp = $booking->no_hp;
+        if (str_starts_with($noHp, '0')) {
+            $noHp = '62' . substr($noHp, 1);
+        }
 
-        $pesan = "🔔 *PENGINGAT JADWAL RUANGAN* 🔔\n\n";
-        $pesan .= "Halo *{$namaPeminjam}*,\n";
-        $pesan .= "Pesan ini adalah pengingat bahwa jadwal booking Anda sudah *semakin dekat*.\n\n";
-        $pesan .= "📌 *Ruangan:* {$namaRuangan}\n";
-        $pesan .= "🗓️ *Tanggal:* {$tanggalIndo}\n";
-        $pesan .= "🕒 *Waktu:* {$jam} WIB\n";
-        $pesan .= "🏷️ *KODE:* {$booking->kode_booking}\n\n";
-        $pesan .= "Sampai jumpa di lokasi! 👋";
+        // 2. RAKIT PESAN (Pakai Kode Unicode agar 1000% kebal kotak hitam)
+        // \u{1F514} = 🔔 , \u{1F4CC} = 📌 , \u{1F4C5} = 📅 , \u{23F0} = ⏰ , \u{2728} = ✨
+        $pesan = "\u{1F514} *PENGINGAT JADWAL RUANGAN* \u{1F514}\n\n";
+        $pesan .= "Halo *{$booking->user->name}*,\n";
+        $pesan .= "Jadwal booking ruangan Anda sudah semakin dekat.\n\n";
+        $pesan .= "\u{1F4CC} *Ruangan:* {$booking->ruangan->nama_ruangan}\n";
+        $pesan .= "\u{1F4C5} *Tanggal:* " . \Carbon\Carbon::parse($booking->waktu_mulai)->translatedFormat('d F Y') . "\n";
+        $pesan .= "\u{23F0} *Waktu:* " . \Carbon\Carbon::parse($booking->waktu_mulai)->format('H:i') . " WIB\n\n";
+        $pesan .= "Sampai jumpa di lokasi! \u{2728}";
 
-        $url = "https://api.whatsapp.com/send?phone=" . $booking->no_hp . "&text=" . rawurlencode($pesan);
+        // 3. Gunakan rumus sukses: api.whatsapp.com + rawurlencode
+        $url = "https://api.whatsapp.com/send?phone=" . $noHp . "&text=" . rawurlencode($pesan);
 
         return redirect()->away($url);
     }
