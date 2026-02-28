@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\UserController;
+use Yajra\DataTables\Facades\DataTables;
 
 // ==========================================
 // 1. ZONA OTENTIKASI (LOGIN & LOGOUT)
@@ -31,6 +33,12 @@ Route::post('/booking/store', [BookingController::class, 'store'])->name('bookin
 // 3. ZONA ADMIN (WAJIB LOGIN)
 // ==========================================
 Route::middleware('auth')->group(function () {
+
+    // --- Rute Profil & Petugas ---
+    Route::get('/profile', [UserController::class, 'profile'])->name('profile.index');
+    Route::post('/profile/update', [UserController::class, 'updateProfile'])->name('profile.update');
+
+    Route::resource('users', UserController::class);
 
     // Dashboard Admin
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');

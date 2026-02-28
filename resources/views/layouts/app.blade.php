@@ -187,15 +187,59 @@
                         </a>
                     </li>
 
-                    <li class="nav-item ms-3">
-                        <a id="btn-animasi-logout" href="#"
-                            class="btn btn-danger text-white fw-bold px-4 py-2 rounded-pill shadow-sm btn-hover-animasi">
-                            <i class="fas fa-sign-out-alt me-1"></i> Logout
+                    <li class="nav-item dropdown ms-3">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center bg-white rounded-pill px-3 py-1 shadow-sm border transition-all hover-primary"
+                            href="#" id="navbarDropdownProfile" role="button" data-bs-toggle="dropdown"
+                            aria-expanded="false">
+
+                            <img src="{{ auth()->user()->foto ? asset(auth()->user()->foto) : 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->name) . '&background=0d6efd&color=fff&rounded=true&bold=true' }}"
+                                alt="Profile" class="rounded-circle me-2 shadow-sm" width="32" height="32"
+                                style="object-fit: cover;">
+
+                            <span
+                                class="fw-bold text-dark me-1 d-none d-sm-inline-block">{{ auth()->user()->name }}</span>
                         </a>
 
-                        <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
-                            @csrf
-                        </form>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-3 p-2"
+                            aria-labelledby="navbarDropdownProfile" style="border-radius: 15px; min-width: 240px;">
+
+                            <li class="px-3 py-3 text-center">
+                                <span class="d-block fw-bold text-dark">{{ auth()->user()->name }}</span>
+                                <small class="text-muted">{{ auth()->user()->email }}</small>
+                            </li>
+                            <li>
+                                <hr class="dropdown-divider mb-2 mx-2">
+                            </li>
+
+                            <li class="mb-1 px-1">
+                                <a class="dropdown-item py-2 fw-medium rounded-pill {{ request()->routeIs('profile.index') ? 'active bg-primary text-white shadow-sm' : 'text-secondary hover-primary' }}"
+                                    href="{{ route('profile.index') }}">
+                                    <i
+                                        class="fas fa-user-edit me-2 {{ request()->routeIs('profile.index') ? 'text-white' : 'text-primary' }}"></i>
+                                    Edit Profil
+                                </a>
+                            </li>
+
+                            <li class="px-1">
+                                <a class="dropdown-item py-2 fw-medium rounded-pill {{ request()->routeIs('users.*') ? 'active bg-primary text-white shadow-sm' : 'text-secondary hover-primary' }}"
+                                    href="{{ route('users.index') }}">
+                                    <i
+                                        class="fas fa-users-cog me-2 {{ request()->routeIs('users.*') ? 'text-white' : 'text-primary' }}"></i>
+                                    Kelola Petugas
+                                </a>
+                            </li>
+
+                            <li>
+                                <hr class="dropdown-divider mt-2 mb-2 mx-2">
+                            </li>
+
+                            <li class="px-1">
+                                <a class="dropdown-item py-2 fw-bold text-danger rounded-pill hover-danger"
+                                    href="#" id="btn-animasi-logout">
+                                    <i class="fas fa-sign-out-alt me-2"></i> Logout
+                                </a>
+                            </li>
+                        </ul>
                     </li>
 
                     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
