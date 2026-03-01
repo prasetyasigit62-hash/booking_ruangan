@@ -60,17 +60,27 @@ class UserController extends Controller
 
         return back()->with('success', 'Profil dan Kredensial berhasil diperbarui! ✨');
     }
-    
+
     // ==========================================
     // 2. FITUR MANAJEMEN PETUGAS (CRUD)
     // ==========================================
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $data = User::orderBy('created_at', 'desc');
+            // 1. FILTER: Hanya panggil admin & petugas (abaikan tamu/user)
+            $data = User::whereIn('role', ['admin', 'petugas'])->orderBy('created_at', 'desc');
 
             return DataTables::of($data)
                 ->addIndexColumn()
+
+                // 2. TAMBAHAN: Kolom Badge untuk Role
+                ->addColumn('role_badge', function ($row) {
+                    if ($row->role == 'admin') {
+                        return '<span class="badge bg-danger"><i class="fas fa-crown me-1"></i> Master Admin</span>';
+                    }
+                    return '<span class="badge bg-primary"><i class="fas fa-user-tie me-1"></i> Petugas</span>';
+                })
+
                 ->addColumn('terdaftar', function ($row) {
                     return $row->created_at->translatedFormat('d F Y');
                 })
@@ -79,7 +89,7 @@ class UserController extends Controller
 
                     // Tombol Edit (Kirim data ke JS)
                     $btn .= '<button type="button" class="btn-action btn-action-info" 
-                                onclick="editPetugas(' . $row->id . ', \'' . addslashes($row->name) . '\', \'' . addslashes($row->email) . '\')" 
+                                onclick="editPetugas(' . $row->id . ', \'' . addslashes($row->name) . '\', \'' . addslashes($row->email) . '\', \'' . $row->role . '\')"
                                 title="Edit Petugas">
                                 <i class="fas fa-edit"></i>
                              </button>';
@@ -98,7 +108,8 @@ class UserController extends Controller
                     $btn .= '</div>';
                     return $btn;
                 })
-                ->rawColumns(['aksi'])
+                // 3. WAJIB: Tambahkan 'role_badge' di sini agar warna-warninya muncul
+                ->rawColumns(['aksi', 'role_badge'])
                 ->make(true);
         }
 
@@ -108,15 +119,17 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:8'
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|min:8',
+            'role'     => 'required|in:admin,petugas' // <--- 1. Tambahan validasi Role
         ]);
 
         User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password)
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
+            'role'     => $request->role // <--- 2. Tambahan simpan Role
         ]);
 
         return back()->with('success', 'Petugas baru berhasil ditambahkan! 🎉');
@@ -127,13 +140,15 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $user->id,
-            'password' => 'nullable|min:8' // Opsional jika ingin ganti password
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email,' . $user->id,
+            'password' => 'nullable|min:8', // Opsional jika ingin ganti password
+            'role'     => 'required|in:admin,petugas' // <--- 1. Tambahan validasi Role
         ]);
 
         $user->name = $request->name;
         $user->email = $request->email;
+        $user->role = $request->role; // <--- 2. Tambahan update Role
 
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);

@@ -88,6 +88,7 @@
                                 <th width="5%" class="text-center">No</th>
                                 <th>Nama Lengkap</th>
                                 <th>Alamat Email</th>
+                                <th class="text-center">Peran / Jabatan</th>
                                 <th>Terdaftar Sejak</th>
                                 <th width="15%" class="text-center">Aksi</th>
                             </tr>
@@ -119,6 +120,16 @@
                             <label class="form-label fw-bold text-secondary">Alamat Email</label>
                             <input type="email" name="email" class="form-control" required>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary">Pilih Role / Peran</label>
+                            <select class="form-select" name="role" required>
+                                <option value="" selected disabled>-- Pilih Hak Akses --</option>
+                                <option value="petugas">Petugas Biasa</option>
+                                <option value="admin">Master Admin</option>
+                            </select>
+                        </div>
+
                         <div class="mb-2">
                             <label class="form-label fw-bold text-secondary">Kata Sandi Awal</label>
                             <input type="password" name="password" class="form-control" required>
@@ -154,10 +165,19 @@
                             <label class="form-label fw-bold text-secondary">Alamat Email</label>
                             <input type="email" id="edit_email" name="email" class="form-control" required>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-secondary">Ubah Role / Peran</label>
+                            <select class="form-select" id="edit_role" name="role" required>
+                                <option value="petugas">Petugas Biasa</option>
+                                <option value="admin">Master Admin</option>
+                            </select>
+                        </div>
+
                         <div class="mb-2">
                             <label class="form-label fw-bold text-secondary">Kata Sandi Baru (Opsional)</label>
                             <input type="password" name="password" class="form-control"
-                                placeholder="Isi untuk reset sandi">
+                                placeholder="Kosongkan jika tidak ingin diubah">
                         </div>
                     </div>
                     <div class="modal-footer bg-light" style="border-radius: 0 0 15px 15px;">
@@ -203,6 +223,12 @@
                         data: 'email',
                         name: 'email'
                     },
+                    // Tambahan Pemanggilan Kolom Role_Badge
+                    {
+                        data: 'role_badge',
+                        name: 'role',
+                        className: 'text-center'
+                    },
                     {
                         data: 'terdaftar',
                         name: 'created_at'
@@ -218,17 +244,15 @@
             });
         });
 
-        // Fungsi untuk melempar data dari DataTables ke Modal Edit
-        function editPetugas(id, name, email) {
-            // Isi inputan form
+        // Modifikasi fungsi edit agar menangkap data role
+        function editPetugas(id, name, email, role) {
             $('#edit_name').val(name);
             $('#edit_email').val(email);
+            $('#edit_role').val(role); // Set dropdown role otomatis
 
-            // Ubah tujuan URL Form ke route Update sesuai ID
             let url = `/users/${id}`;
             $('#formEditPetugas').attr('action', url);
 
-            // Munculkan Modal
             $('#modalEdit').modal('show');
         }
     </script>
