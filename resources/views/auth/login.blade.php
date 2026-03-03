@@ -127,7 +127,7 @@
             <div class="login-header">
                 <i class="fas fa-fingerprint login-icon"></i>
                 <h3 class="fw-bold mb-1">Portal Admin</h3>
-                <p class="mb-0 opacity-75 small">Sistem Informasi Lembur & Manajemen Ruangan</p>
+                <p class="mb-0 opacity-75 small">Sistem Informasi Manajemen Booking Ruangan</p>
             </div>
 
             <div class="p-4 p-md-5">
